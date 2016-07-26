@@ -66,19 +66,41 @@ static void UnitySendMessage(
                 @"Library/ScriptAssemblies/Assembly-CSharp-firstpass.dll";
         } else {
             NSString *dllPath =
-                @"Contents/Data/Managed/Assembly-CSharp-firstpass.dll";
+                @"Contents/Resources/Data/Managed/Assembly-CSharp-firstpass.dll";
             assemblyPath = [[[NSBundle mainBundle] bundlePath]
                 stringByAppendingPathComponent:dllPath];
         }
         monoDomain = mono_domain_get();
+        monoDesc = mono_method_desc_new(
+            "UnitySendMessageDispatcher:Dispatch(string,string,string)", FALSE);
+        
         monoAssembly =
             mono_domain_assembly_open(monoDomain, [assemblyPath UTF8String]);
         monoImage = mono_assembly_get_image(monoAssembly);
-        monoDesc = mono_method_desc_new(
-            "UnitySendMessageDispatcher:Dispatch(string,string,string)", FALSE);
+        
         monoMethod = mono_method_desc_search_in_image(monoDesc, monoImage);
+        
+        if (monoMethod == 0) {
+            if (inEditor) {
+                assemblyPath =
+                    @"Library/ScriptAssemblies/Assembly-CSharp.dll";
+            } else {
+                NSString *dllPath =
+                    @"Contents/Resources/Data/Managed/Assembly-CSharp.dll";
+                assemblyPath = [[[NSBundle mainBundle] bundlePath]
+                                stringByAppendingPathComponent:dllPath];
+            }
+            monoAssembly =
+                mono_domain_assembly_open(monoDomain, [assemblyPath UTF8String]);
+            monoImage = mono_assembly_get_image(monoAssembly);
+            monoMethod = mono_method_desc_search_in_image(monoDesc, monoImage);
+        }
     }
-
+    
+    if (monoMethod == 0) {
+        return;
+    }
+    
     void *args[] = {
         mono_string_new(monoDomain, gameObject),
         mono_string_new(monoDomain, method),
@@ -111,6 +133,7 @@ static void UnitySendMessage(
         [webView setDrawsBackground:NO];
     }
     [webView setAutoresizingMask:(NSViewWidthSizable|NSViewHeightSizable)];
+    [webView setFrameLoadDelegate:(id)self];
     [webView setPolicyDelegate:(id)self];
     gameObject = [[NSString stringWithUTF8String:gameObject_] retain];
     if (ua_ != NULL && strcmp(ua_, "") != 0) {
@@ -143,12 +166,16 @@ static void UnitySendMessage(
     [super dealloc];
 }
 
+- (void)webView:(WebView *)sender didFailProvisionalLoadWithError:(NSError *)error forFrame:(WebFrame *)frame
+{
+    UnitySendMessage([gameObject UTF8String], "CallOnError", [[error description] UTF8String]);
+}
+
 - (void)webView:(WebView *)sender decidePolicyForNavigationAction:(NSDictionary *)actionInformation request:(NSURLRequest *)request frame:(WebFrame *)frame decisionListener:(id<WebPolicyDecisionListener>)listener
 {
     NSString *url = [[request URL] absoluteString];
     if ([url hasPrefix:@"unity:"]) {
-        UnitySendMessage([gameObject UTF8String],
-            "CallFromJS", [[url substringFromIndex:6] UTF8String]);
+        UnitySendMessage([gameObject UTF8String], "CallFromJS", [[url substringFromIndex:6] UTF8String]);
         [listener ignore];
     } else {
         [listener use];
@@ -194,6 +221,20 @@ static void UnitySendMessage(
         return;
     NSString *jsStr = [NSString stringWithUTF8String:js];
     [webView stringByEvaluatingJavaScriptFromString:jsStr];
+}
+
+- (void)goBack
+{
+    if (webView == nil)
+        return;
+    [webView goBack];
+}
+
+- (void)goForward
+{
+    if (webView == nil)
+        return;
+    [webView goForward];
 }
 
 - (void)update:(int)x y:(int)y deltaY:(float)deltaY buttonDown:(BOOL)buttonDown buttonPress:(BOOL)buttonPress buttonRelease:(BOOL)buttonRelease keyPress:(BOOL)keyPress keyCode:(unsigned short)keyCode keyChars:(const char*)keyChars
@@ -325,6 +366,8 @@ void _CWebViewPlugin_SetRect(void *instance, int width, int height);
 void _CWebViewPlugin_SetVisibility(void *instance, BOOL visibility);
 void _CWebViewPlugin_LoadURL(void *instance, const char *url);
 void _CWebViewPlugin_EvaluateJS(void *instance, const char *url);
+void _CWebViewPlugin_GoBack(void *instance);
+void _CWebViewPlugin_GoForward(void *instance);
 void _CWebViewPlugin_Update(void *instance, int x, int y, float deltaY,
     BOOL buttonDown, BOOL buttonPress, BOOL buttonRelease,
     BOOL keyPress, unsigned char keyCode, const char *keyChars);
@@ -387,6 +430,18 @@ void _CWebViewPlugin_EvaluateJS(void *instance, const char *js)
 {
     CWebViewPlugin *webViewPlugin = (CWebViewPlugin *)instance;
     [webViewPlugin evaluateJS:js];
+}
+
+void _CWebViewPlugin_GoBack(void *instance)
+{
+    CWebViewPlugin *webViewPlugin = (__bridge CWebViewPlugin *)instance;
+    [webViewPlugin goBack];
+}
+
+void _CWebViewPlugin_GoForward(void *instance)
+{
+    CWebViewPlugin *webViewPlugin = (__bridge CWebViewPlugin *)instance;
+    [webViewPlugin goForward];
 }
 
 void _CWebViewPlugin_Update(void *instance, int x, int y, float deltaY,
