@@ -115,6 +115,7 @@ public class CWebViewPlugin {
             webView.addJavascriptInterface(mWebViewPlugin , "Unity");
             
             WebSettings webSettings = webView.getSettings();
+			webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
             webSettings.setSupportZoom(false);
             webSettings.setJavaScriptEnabled(true);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -187,7 +188,10 @@ public class CWebViewPlugin {
             if (mWebView == null) {
                 return;
             }
-            mWebView.loadUrl(url);
+
+//            mWebView.loadUrl(url);
+            int index = url.lastIndexOf('/');
+            mWebView.loadDataWithBaseURL( url.substring(0,index+1), url.substring(index+1),"text/html", "utf-8", null);
         }});
     }
 
