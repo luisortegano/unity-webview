@@ -86,13 +86,13 @@ public class CWebViewPlugin {
             webView.setFocusable(true);
             webView.setFocusableInTouchMode(true);
 
-            // webView.setWebChromeClient(new WebChromeClient() {
-            //     public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
-            //         Log.d("Webview", cm.message());
-            //         return true;
-            //     }
-            // });
-            webView.setWebChromeClient(new WebChromeClient());
+            webView.setWebChromeClient(new WebChromeClient() {
+                public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
+                    Log.d("Webview", cm.message());
+                    return true;
+                }
+            });
+            //webView.setWebChromeClient(new WebChromeClient());
 
             mWebViewPlugin = new CWebViewPluginInterface(self, gameObject);
             webView.setWebViewClient(new WebViewClient() {
